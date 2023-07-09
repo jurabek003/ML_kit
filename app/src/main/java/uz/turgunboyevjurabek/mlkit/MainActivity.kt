@@ -9,6 +9,7 @@ import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.SurfaceTexture
 import android.hardware.camera2.CameraCaptureSession
+import android.hardware.camera2.CameraCharacteristics
 import android.hardware.camera2.CameraDevice
 import android.hardware.camera2.CameraManager
 import android.opengl.ETC1Util.ETC1Texture
@@ -83,16 +84,16 @@ class MainActivity : AppCompatActivity() {
                 val outputs = model.process(inputFeature0)
                 val outputFeature0 = outputs.outputFeature0AsTensorBuffer.floatArray
 
-                var mutable=bitmap.copy(Bitmap.Config.ARGB_8888,true)
-                var canvas=Canvas(mutable)
-                var h=bitmap.height
-                var w=bitmap.width
+                val mutable=bitmap.copy(Bitmap.Config.ARGB_8888,true)
+                val canvas=Canvas(mutable)
+                val h=bitmap.height
+                val w=bitmap.width
 
                 var x=0
 
                 while (x<=49){
-                    if (outputFeature0.get(x+2)>0.45){
-                        canvas.drawCircle(outputFeature0.get(x+1)*w,outputFeature0.get(x)*h,10f,paint)
+                    if (outputFeature0.get(x+2)>0.045){
+                        canvas.drawCircle(outputFeature0.get(x+1)*w,outputFeature0.get(x)*h,5f,paint)
                     }
                     x+=3
                 }
@@ -109,36 +110,43 @@ class MainActivity : AppCompatActivity() {
     }
     @SuppressLint("MissingPermission")
      fun openCamera() {
-        cameraManager.openCamera(cameraManager.cameraIdList[0], object : CameraDevice.StateCallback(){
-            override fun onOpened(camera: CameraDevice) {
-                textureView= TextureView(this@MainActivity)
-                var captureRequest=camera.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW)
-                textureView = binding.textrueView
-                var surface=Surface(textureView.surfaceTexture)
-                captureRequest.addTarget(surface)
+            val cameraId = cameraManager.cameraIdList.find { cameraId ->
+                val cameraCharacteristics = cameraManager.getCameraCharacteristics(cameraId)
+                val facing = cameraCharacteristics.get(CameraCharacteristics.LENS_FACING)
+                facing == CameraCharacteristics.LENS_FACING_FRONT
+            }
 
-                camera.createCaptureSession(listOf(surface),object :CameraCaptureSession.StateCallback(){
-                    override fun onConfigured(session: CameraCaptureSession) {
-                        session.setRepeatingRequest(captureRequest.build(),null,null)
+            cameraId?.let { id ->
+                cameraManager.openCamera(id, object : CameraDevice.StateCallback() {
+                    override fun onOpened(camera: CameraDevice) {
+                        textureView= TextureView(this@MainActivity)
+                        var captureRequest=camera.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW)
+                        textureView = binding.textrueView
+                        var surface=Surface(textureView.surfaceTexture)
+                        captureRequest.addTarget(surface)
+
+                        camera.createCaptureSession(listOf(surface),object :CameraCaptureSession.StateCallback(){
+                            override fun onConfigured(session: CameraCaptureSession) {
+                                session.setRepeatingRequest(captureRequest.build(),null,null)
+                            }
+
+                            override fun onConfigureFailed(session: CameraCaptureSession) {
+
+                            }
+                        },handler)
+
                     }
 
-                    override fun onConfigureFailed(session: CameraCaptureSession) {
-
+                    override fun onDisconnected(camera: CameraDevice) {
+                        // Kamera bağlantısı kesildiğinde yapılacak işlemler
                     }
-                },handler)
 
+                    override fun onError(camera: CameraDevice, error: Int) {
+                        // Kamera hatası durumunda yapılacak işlemler
+                    }
+                }, handler)
             }
-
-            override fun onDisconnected(camera: CameraDevice) {
-
-            }
-
-            override fun onError(camera: CameraDevice, error: Int) {
-
-            }
-        },handler)
-    }
-
+        }
     private fun get_premissions() {
         if (checkSelfPermission(android.Manifest.permission.CAMERA)!=PackageManager.PERMISSION_GRANTED){
             requestPermissions(arrayOf(android.Manifest.permission.CAMERA),101)
